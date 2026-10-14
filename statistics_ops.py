@@ -1,19 +1,10 @@
-"""Юрий: Часть 1: яркость, гистограммы и статистики окна.
-Профиль строки также рассчитывается здесь.
-
-Математика выполняется вручную.
-Импортов библиотек в этом файле нет.
-Изображение: image[y][x] == (R, G, B), начало координат слева сверху.
-"""
-
 Pixel = tuple[int, int, int]
 RGBImage = list[list[Pixel]]
 ScalarImage = list[list[float]]
 
 
 def clamp(value: float) -> int:
-    """Ограничить канал диапазоном 0..255.
-
+    """Ограничить канал диапазоном 0..255
     Округлить до ближайшего целого.
     """
     if value <= 0:
@@ -24,7 +15,7 @@ def clamp(value: float) -> int:
 
 
 def intensity(pixel: Pixel) -> float:
-    """Яркость строго по заданию: (R + G + B) / 3, без округления."""
+    """Яркость: (R + G + B) / 3."""
     red, green, blue = pixel
     return (red + green + blue) / 3.0
 
@@ -56,7 +47,7 @@ def component_image(image: RGBImage, channel: int) -> RGBImage:
 
 
 def histograms(image: RGBImage) -> list[list[int]]:
-    """Абсолютные частоты I, R, G, B; яркость округлена до корзин 0..255."""
+    """Абсолютные частоты I, R, G, B; яркость 0..255."""
     result = [[0] * 256 for _ in range(4)]
     for row in image:
         for pixel in row:
@@ -69,7 +60,7 @@ def histograms(image: RGBImage) -> list[list[int]]:
 def statistics(
     values: list[float], method: str = 'two_pass'
 ) -> tuple[float, float, float]:
-    """Вернуть среднее, дисперсию и СКО; делитель N, как в лекции.
+    """Вернуть среднее, дисперсию и СКО; делитель N
 
     two_pass: D = sum((u - mean) ** 2) / N, два прохода.
     one_pass: D = sum(u ** 2) / N - mean ** 2, один проход.
@@ -90,8 +81,8 @@ def statistics(
 
     if method == 'one_pass':
         variance = square_total / count - mean * mean
-        # Погрешность float иногда даёт очень маленькое
-        # отрицательное число.
+        # Погрешность float иногда даёт отрицательное число,
+        # очень близкое к нулю.
         if variance < 0:
             variance = 0.0
     else:
@@ -106,7 +97,6 @@ def window_values(
     image: RGBImage, x: int, y: int, size: int = 11
 ) -> list[float]:
     """Яркости окна вокруг (x, y).
-
     У края окно пересекается с изображением.
     """
     height, width = len(image), len(image[0])
@@ -124,7 +114,6 @@ def window_values(
 
 def row_profile(image: RGBImage, row_y: int) -> list[float]:
     """Профиль яркости одной пиксельной строки.
-
     Индексы строк начинаются от нуля.
     """
     if not 0 <= row_y < len(image):
@@ -136,22 +125,26 @@ def row_profile(image: RGBImage, row_y: int) -> list[float]:
 
 
 def demo_image() -> RGBImage:
-    """Учебное RGB-изображение: однородность, полосы, цвет и шум."""
+    """Простой цветной градиент: R=x, G=y, B=64."""
     image = []
-    stripe_levels = [28] * 5 + [128] + [228] * 5
     for y in range(192):
         row = []
         for x in range(256):
-            if y < 96 and x < 128:
-                pixel = (128, 128, 128)
-            elif y < 96:
-                value = stripe_levels[(x - 128) % 11]
-                pixel = (value, value, value)
-            elif x < 128:
-                pixel = (x * 2, (y - 96) * 2, 255 - x * 2)
-            else:
-                value = 128 + ((x * 37 + y * 61) % 161) - 80
-                pixel = (value, value, value)
-            row.append(pixel)
+            row.append((x, y, 64))
         image.append(row)
+    return image
+
+
+def blur_demo_image() -> RGBImage:
+    """Резкие границы и светлая точка на чёрном фоне."""
+    image = []
+    for y in range(192):
+        row = []
+        for x in range(256):
+            value = 255 if x >= 128 else 0
+            if 32 <= x < 48 and 32 <= y < 48:
+                value = 255
+            row.append((value, value, value))
+        image.append(row)
+    image[96][64] = (255, 255, 255)
     return image

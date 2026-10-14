@@ -9,7 +9,8 @@ from PIL import Image
 import image_ops
 from image_io import load_rgb, save_rgb
 from statistics_ops import (
-    component_image, demo_image, histograms, intensity, row_profile,
+    blur_demo_image, component_image, demo_image, histograms,
+    intensity, row_profile,
     statistics, window_values,
 )
 
@@ -50,15 +51,44 @@ class StatisticsTests(unittest.TestCase):
             statistics([])
 
     def test_homogeneous_and_heterogeneous_same_mean(self) -> None:
-        image = demo_image()
-        mean, variance, _ = statistics(window_values(image, 64, 48))
+        stripe_levels = [28] * 5 + [128] + [228] * 5
+        image = gray_image([[128] * 20 + stripe_levels * 2
+                            for _ in range(20)])
+        mean, variance, _ = statistics(window_values(image, 10, 10))
         self.assertEqual((mean, variance), (128, 0))
-        mean, variance, _ = statistics(window_values(image, 192, 48))
+        mean, variance, _ = statistics(window_values(image, 30, 10))
         self.assertEqual(mean, 128)
         self.assertAlmostEqual(variance, 100000 / 11)
 
+    def test_gradient_and_uniform_example(self) -> None:
+        image = demo_image()
+        self.assertEqual(image[48][64], (64, 48, 64))
+        mean, variance, deviation = statistics(window_values(image, 64, 48))
+        self.assertAlmostEqual(mean, 176 / 3)
+        self.assertAlmostEqual(variance, 20 / 9)
+        self.assertAlmostEqual(deviation, (20 / 9) ** 0.5)
+        uniform = image_ops.point_transform(image, 'contrast', 0)
+        self.assertTrue(all(pixel == (96, 96, 96)
+                            for row in uniform for pixel in row))
+        self.assertEqual(statistics(window_values(uniform, 64, 48)),
+                         (96, 0, 0))
+
 
 class TransformTests(unittest.TestCase):
+    def test_blur_demo_impulse_and_straight_edge(self) -> None:
+        image = blur_demo_image()
+        four = image_ops.blur(image, 4)
+        eight = image_ops.blur(image, 8)
+        self.assertEqual(image[96][64], (255, 255, 255))
+        self.assertEqual(four[96][64], (51, 51, 51))
+        self.assertEqual(eight[96][64], (28, 28, 28))
+        self.assertEqual(four[96][127], (51, 51, 51))
+        self.assertEqual(four[96][128], (204, 204, 204))
+        self.assertEqual(eight[96][127], (85, 85, 85))
+        self.assertEqual(eight[96][128], (170, 170, 170))
+        self.assertEqual(statistics(window_values(image, 32, 96)),
+                         (0, 0, 0))
+
     def test_brightness_clipping_and_channel_target(self) -> None:
         image = [[(250, 10, 0)]]
         result = image_ops.point_transform(image, 'brightness', 20, 0)

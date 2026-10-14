@@ -3,49 +3,96 @@
 import tkinter as tk
 from tkinter import ttk
 
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 from image_io import to_pillow
 from statistics_ops import RGBImage
 
 
 class ImagePanel(ttk.Frame):
-    """Изображение в масштабе 1:1, прокрутка и события мыши."""
+    """Вписывание изображения и перевод экранных координат."""
 
     def __init__(self, parent: tk.Misc) -> None:
         super().__init__(parent)
         self.photo: ImageTk.PhotoImage | None = None
+        self.source: Image.Image | None = None
+        self.display_size = (0, 0)
+        self.offset = (0, 0)
+        self.window_pixel: tuple[int, int] | None = None
         self.canvas = tk.Canvas(
             self, background='#252525', highlightthickness=0,
         )
-        vertical = ttk.Scrollbar(
-            self, orient='vertical', command=self.canvas.yview,
-        )
-        horizontal = ttk.Scrollbar(
-            self, orient='horizontal', command=self.canvas.xview,
-        )
-        self.canvas.configure(
-            yscrollcommand=vertical.set, xscrollcommand=horizontal.set,
-        )
         self.canvas.grid(row=0, column=0, sticky='nsew')
-        vertical.grid(row=0, column=1, sticky='ns')
-        horizontal.grid(row=1, column=0, sticky='ew')
+        self.canvas.bind('<Configure>', self.redraw)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
     def show(self, image: RGBImage) -> None:
         """Показать изображение без изменения массива пикселей."""
-        self.photo = ImageTk.PhotoImage(to_pillow(image))
+        self.source = to_pillow(image)
+        self.window_pixel = None
+        self.redraw()
+
+    def clear(self) -> None:
+        """Убрать картинку, в том числе при следующем изменении окна."""
+        self.source = None
+        self.photo = None
+        self.display_size = (0, 0)
+        self.offset = (0, 0)
+        self.clear_window()
         self.canvas.delete('all')
-        self.canvas.create_image(0, 0, image=self.photo, anchor='nw')
-        self.canvas.configure(scrollregion=(0, 0, len(image[0]), len(image)))
+
+    def redraw(self, _event: tk.Event | None = None) -> None:
+        """Вписать только экранную копию, сохранив пропорции."""
+        if self.source is None:
+            return
+        width = max(1, self.canvas.winfo_width())
+        height = max(1, self.canvas.winfo_height())
+        source_width, source_height = self.source.size
+        scale = min(width / source_width, height / source_height)
+        target_width = max(1, min(width, round(source_width * scale)))
+        target_height = max(1, min(height, round(source_height * scale)))
+        self.display_size = (target_width, target_height)
+        self.offset = ((width - target_width) // 2,
+                       (height - target_height) // 2)
+        preview = self.source.resize(
+            self.display_size, Image.Resampling.NEAREST,
+        )
+        self.photo = ImageTk.PhotoImage(preview)
+        self.canvas.delete('all')
+        self.canvas.create_image(
+            *self.offset, image=self.photo, anchor='nw',
+        )
+        if self.window_pixel is not None:
+            self.draw_window(*self.window_pixel)
+
+    def image_coordinates(self, x: float, y: float) -> tuple[int, int] | None:
+        """Вернуть пиксель массива; вне картинки вернуть None."""
+        if self.source is None:
+            return None
+        local_x = x - self.offset[0]
+        local_y = y - self.offset[1]
+        width, height = self.display_size
+        if not (0 <= local_x < width and 0 <= local_y < height):
+            return None
+        source_width, source_height = self.source.size
+        return (int(local_x * source_width / width),
+                int(local_y * source_height / height))
+
+    def clear_window(self) -> None:
+        """Убрать рамку и забыть её положение."""
+        self.window_pixel = None
+        self.canvas.delete('window')
 
     def draw_window(self, x: int, y: int) -> None:
         """Нарисовать внешнюю рамку 13×13 четырьмя полосками.
-
-        Ширина каждой полоски — один пиксель.
         """
         self.canvas.delete('window')
+        if self.source is None:
+            return
+        self.window_pixel = (x, y)
+        scale_x = self.display_size[0] / self.source.width
+        scale_y = self.display_size[1] / self.source.height
         rectangles = (
             (x - 6, y - 6, x + 7, y - 5),
             (x - 6, y + 6, x + 7, y + 7),
@@ -53,8 +100,13 @@ class ImagePanel(ttk.Frame):
             (x + 6, y - 5, x + 7, y + 6),
         )
         for coordinates in rectangles:
+            left, top, right, bottom = coordinates
             self.canvas.create_rectangle(
-                *coordinates, fill='yellow', outline='', tags='window',
+                self.offset[0] + left * scale_x,
+                self.offset[1] + top * scale_y,
+                self.offset[0] + right * scale_x,
+                self.offset[1] + bottom * scale_y,
+                fill='yellow', outline='', tags='window',
             )
 
 
@@ -63,8 +115,6 @@ def draw_plot(
     color: str, histogram: bool = False,
 ) -> None:
     """Визуализация уже рассчитанных значений.
-
-    Библиотеки статистики не используются.
     """
     canvas.delete('all')
     width = max(260, canvas.winfo_width())

@@ -11,7 +11,7 @@ from analysis_views import build_notebook
 from editor_controls import build_controls
 from image_io import load_rgb, save_rgb
 from statistics_ops import (
-    RGBImage, ScalarImage, clamp, demo_image,
+    RGBImage, ScalarImage, blur_demo_image, clamp, demo_image,
 )
 from view_widgets import ImagePanel
 
@@ -75,6 +75,7 @@ class Application:
             ('Открыть', self.open_image),
             ('Сохранить RGB', self.save_image),
             ('Учебный пример', self.load_demo),
+            ('Пример размытия', self.load_blur_demo),
             ('Исходное', self.reset),
             ('Отменить последнее', self.undo),
         )
@@ -124,6 +125,9 @@ class Application:
     def load_demo(self) -> None:
         self.set_image(demo_image(), 'Учебный пример')
 
+    def load_blur_demo(self) -> None:
+        self.set_image(blur_demo_image(), 'Пример размытия')
+
     def save_image(self) -> None:
         if not self.need_image():
             return
@@ -158,12 +162,11 @@ class Application:
             return
         image = (self.original if self.view.get() == self.VIEW_NAMES[1]
                  else self.current)
-        canvas = self.viewer.canvas
-        mouse_x, mouse_y = canvas.canvasx(event.x), canvas.canvasy(event.y)
-        if not (0 <= mouse_x < len(image[0]) and 0 <= mouse_y < len(image)):
+        coordinates = self.viewer.image_coordinates(event.x, event.y)
+        if coordinates is None:
             self.mouse_leave()
             return
-        x, y = int(mouse_x), int(mouse_y)
+        x, y = coordinates
         if self.last_pixel == (x, y):
             return
         self.last_pixel = (x, y)
@@ -173,7 +176,7 @@ class Application:
         analysis_views.update_pixel_info(self, x, y, image)
 
     def mouse_leave(self, _event: tk.Event | None = None) -> None:
-        self.viewer.canvas.delete('window')
+        self.viewer.clear_window()
         self.last_pixel = None
         self.pixel_info.set('Двигайте мышь внутри изображения.')
 
@@ -298,10 +301,8 @@ class Application:
     def map_mouse_move(self, event: tk.Event) -> None:
         if not self.map_values:
             return
-        canvas = self.map_viewer.canvas
-        mouse_x, mouse_y = canvas.canvasx(event.x), canvas.canvasy(event.y)
-        if (0 <= mouse_x < len(self.map_values[0])
-                and 0 <= mouse_y < len(self.map_values)):
-            x, y = int(mouse_x), int(mouse_y)
+        coordinates = self.map_viewer.image_coordinates(event.x, event.y)
+        if coordinates is not None:
+            x, y = coordinates
             self.status.set(f'Карта контрастности: x={x}, y={y}, '
                             f'C(p)={self.map_values[y][x]:.4f}.')
