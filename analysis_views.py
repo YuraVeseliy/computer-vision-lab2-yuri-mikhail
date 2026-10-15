@@ -33,8 +33,10 @@ def build_notebook(app: 'Application', parent: ttk.Frame) -> None:
     app.viewer.canvas.bind('<Motion>', app.mouse_move)
     app.viewer.canvas.bind('<Leave>', app.mouse_leave)
     app.viewer.canvas.bind('<Button-1>', app.select_profile_row)
-    ttk.Label(viewer_tab, textvariable=app.pixel_info, justify='left',
-              padding=7).pack(fill='x')
+    # Высота в две строки постоянна: иначе смена текста меняет
+    # размер Canvas, картинка сдвигается, и у края она дёргается.
+    tk.Label(viewer_tab, textvariable=app.pixel_info, justify='left',
+             anchor='w', height=2, padx=7, pady=7).pack(fill='x')
 
     app.channels_tab = ttk.Frame(app.notebook)
     app.notebook.add(app.channels_tab, text='Каналы и гистограммы')
