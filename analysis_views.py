@@ -16,49 +16,47 @@ from view_widgets import ImagePanel, draw_plot
 if TYPE_CHECKING:
     from application import Application
 
-
+# создание вкладок
 def build_notebook(app: 'Application', parent: ttk.Frame) -> None:
     app.notebook = ttk.Notebook(parent)
-    app.notebook.pack(side='left', fill='both', expand=True)
+    app.notebook.pack(side='left', fill='both', expand=True) # создание контейнера
     viewer_tab = ttk.Frame(app.notebook)
     app.notebook.add(viewer_tab, text='Просмотр и окно 11×11')
-    selector = ttk.Combobox(
+    selector = ttk.Combobox( # создание выпадающего списка r g b и яркости
         viewer_tab, textvariable=app.view,
         values=app.VIEW_NAMES, state='readonly', width=25,
     )
-    selector.pack(anchor='w', pady=5)
-    selector.bind('<<ComboboxSelected>>', app.change_view)
+    selector.pack(anchor='w', pady=5) # расположение списка
+    selector.bind('<<ComboboxSelected>>', app.change_view) # для показа нужного пункта
     app.viewer = ImagePanel(viewer_tab)
-    app.viewer.pack(fill='both', expand=True)
+    app.viewer.pack(fill='both', expand=True) # фон панели
     app.viewer.canvas.bind('<Motion>', app.mouse_move)
     app.viewer.canvas.bind('<Leave>', app.mouse_leave)
     app.viewer.canvas.bind('<Button-1>', app.select_profile_row)
-    # Высота в две строки постоянна: иначе смена текста меняет
-    # размер Canvas, картинка сдвигается, и у края она дёргается.
     tk.Label(viewer_tab, textvariable=app.pixel_info, justify='left',
-             anchor='w', height=2, padx=7, pady=7).pack(fill='x')
+             anchor='w', height=2, padx=7, pady=7).pack(fill='x') # текстовая облась снизу
 
     app.channels_tab = ttk.Frame(app.notebook)
     app.notebook.add(app.channels_tab, text='Каналы и гистограммы')
-    app.preview_labels = []
-    app.histogram_canvases = []
+    app.preview_labels = [] # картинки каналов (элементы интерфейса)
+    app.histogram_canvases = [] # где рисуются гистограммы (элементы интерфейса)
     titles = ('Яркость I=(R+G+B)/3', 'Красный канал R',
               'Зелёный канал G', 'Синий канал B')
     for index, title in enumerate(titles):
         panel = ttk.LabelFrame(app.channels_tab, text=title, padding=4)
-        panel.grid(
+        panel.grid( # размещение панелей в сетке 2х2
             row=index // 2, column=index % 2,
             sticky='nsew', padx=3, pady=3,
         )
         preview = ttk.Label(panel, anchor='center')
-        preview.pack(fill='x')
+        preview.pack(fill='x') # элемент над графиком
         plot = tk.Canvas(panel, background='white', height=145,
                          highlightthickness=0)
-        plot.pack(fill='both', expand=True)
-        plot.bind('<Configure>', app.redraw_histograms)
+        plot.pack(fill='both', expand=True) # белая область для гистограммы
+        plot.bind('<Configure>', app.redraw_histograms) # перерисовка при изменениях
         app.preview_labels.append(preview)
         app.histogram_canvases.append(plot)
-    for index in range(2):
+    for index in range(2): # доп пространство при увеличении окна для каждого графика
         app.channels_tab.rowconfigure(index, weight=1)
         app.channels_tab.columnconfigure(index, weight=1)
 
@@ -77,7 +75,7 @@ def build_notebook(app: 'Application', parent: ttk.Frame) -> None:
         profile_tab, text='Профиль строится по исходному RGB. '
         'Строку можно выбрать щелчком на вкладке просмотра.',
     ).pack(anchor='w', pady=6)
-    app.profile_canvas = tk.Canvas(
+    app.profile_canvas = tk.Canvas( # белый фон на котором строится график
         profile_tab, background='white', highlightthickness=0,
     )
     app.profile_canvas.pack(fill='both', expand=True)
@@ -97,80 +95,78 @@ def build_notebook(app: 'Application', parent: ttk.Frame) -> None:
     ttk.Button(map_controls, text='Рассчитать карту',
                command=app.calculate_map).pack(side='left', padx=5)
     app.map_viewer = ImagePanel(map_tab)
-    app.map_viewer.pack(fill='both', expand=True, pady=6)
-    app.map_viewer.canvas.bind('<Motion>', app.map_mouse_move)
+    app.map_viewer.pack(fill='both', expand=True, pady=6) # создаени панели лоя карты контрастности
+    app.map_viewer.canvas.bind('<Motion>', app.map_mouse_move) # значение мышки
     ttk.Label(
         map_tab, textvariable=app.map_info, padding=5,
-    ).pack(fill='x')
+    ).pack(fill='x') # надпись снизу инфа
 
 
-def refresh(app: 'Application') -> None:
-    app.last_pixel = None
+def refresh(app: 'Application') -> None: # обновление изображения после изменений
+    app.last_pixel = None # сброс последних координат под мышкой
     app.pixel_info.set(
         'Двигайте мышь; щелчок выбирает строку профиля.',
     )
     app.change_view()
-    app.distributions = histograms(app.current)
-    app.thumbnail_photos = []
+    app.distributions = histograms(app.current) # вычисление гистограмм по текузему изображению
+    app.thumbnail_photos = [] # сохранение всех картинок на вкладке гистограмм
     for index in range(4):
-        preview = to_pillow(component_image(app.current, index - 1))
-        # Уменьшение относится только к экранному превью.
-        # Вычисления используют полный массив изображения.
+        preview = to_pillow(component_image(app.current, index - 1)) # картинка над графиками
         preview.thumbnail((320, 145), Image.Resampling.NEAREST)
         photo = ImageTk.PhotoImage(preview)
         app.thumbnail_photos.append(photo)
-        app.preview_labels[index].configure(image=photo)
-    app.redraw_histograms()
-    app.map_values = []
+        app.preview_labels[index].configure(image=photo) # добавляем индекс к каждой картнике
+    app.redraw_histograms() # рисование 4 графиков
+    app.map_values = [] # удаление карты контрстности при измененях
     app.map_viewer.clear()
     app.map_info.set('C(p)=|I(p)-μ соседей|. Нажмите «Рассчитать карту».')
 
 
-def change_view(app: 'Application') -> None:
+def change_view(app: 'Application') -> None: # переключтаель изображений
     if not app.current:
-        return
+        return # пустой список если изображения нет
     index = app.VIEW_NAMES.index(app.view.get())
     if index == 0:
-        image = app.current
+        image = app.current # для ргб текущее выбирается текущая картинка
     elif index == 1:
-        image = app.original
+        image = app.original # исходное
     else:
-        image = component_image(app.current, index - 3)
+        image = component_image(app.current, index - 3) # для каждого канала яркость в сером цвете
     app.viewer.show(image)
     app.last_pixel = None
     app.pixel_info.set('Двигайте мышь внутри изображения.')
 
 
-def redraw_histograms(app: 'Application') -> None:
+def redraw_histograms(app: 'Application') -> None: # перерисовка графиков после изменений
     if app.distributions:
         colors = ('#333333', '#d03030', '#208020', '#3050d0')
         for canvas, values, color in zip(app.histogram_canvases,
-                                         app.distributions, colors):
+                                         app.distributions, colors): # объединяем элементы с одинаковыми номерами из трех последовательностей
             draw_plot(canvas, values, color, histogram=True)
 
 
-def show_profile(app: 'Application') -> None:
+def show_profile(app: 'Application') -> None: # получение номера строки и рисование графика по ней
     if not app.need_image():
         return
     try:
-        row_y = int(app.profile_row.get())
-        app.profile_values = row_profile(app.original, row_y)
-        app.redraw_profile()
+        row_y = int(app.profile_row.get()) # значение должно быть int
+        app.profile_values = row_profile(app.original, row_y) # должно быть в границах
+        app.redraw_profile() # рисование графика по сохраненному списку
     except ValueError as error:
         messagebox.showerror('Ошибка номера строки', str(error))
 
 
-def redraw_profile(app: 'Application') -> None:
-    if app.profile_values:
+def redraw_profile(app: 'Application') -> None: # рисование профиля строки по расчитанным яркостям
+    if app.profile_values: # проверка на пустоту списка яркостей
         draw_plot(app.profile_canvas, app.profile_values, '#8050b0')
 
 
-def update_pixel_info(
+def update_pixel_info( # обновление данных о пикселе под мышкой
     app: 'Application', x: int, y: int, image: RGBImage,
 ) -> None:
-    app.viewer.draw_window(x, y)
-    pixel = image[y][x]
-    values = window_values(image, x, y)
+    app.viewer.draw_window(x, y) # рисование рамки вокруг мышки
+    pixel = image[y][x] # р г б пикселей
+    values = window_values(image, x, y) # яркости пикселей
     method = ('two_pass' if app.method.get() == 'Два прохода'
               else 'one_pass')
     mean, variance, deviation = statistics(values, method)
