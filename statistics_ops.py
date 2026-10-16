@@ -1,6 +1,6 @@
-Pixel = tuple[int, int, int]
-RGBImage = list[list[Pixel]]
-ScalarImage = list[list[float]]
+Pixel = tuple[int, int, int] # r g b
+RGBImage = list[list[Pixel]] # список строк пикселей
+ScalarImage = list[list[float]] # 1 пиксель - 1 число
 
 
 def clamp(value: float) -> int:
@@ -15,13 +15,13 @@ def clamp(value: float) -> int:
 
 
 def intensity(pixel: Pixel) -> float:
-    """Яркость: (R + G + B) / 3."""
+    """Яркость: среднее арифметическое трех калаов."""
     red, green, blue = pixel
     return (red + green + blue) / 3.0
 
 
 def intensity_matrix(image: RGBImage) -> ScalarImage:
-    """Получить двумерный список точных значений яркости."""
+    """Яркость по всему изображению."""
     result = []
     for row in image:
         result_row = []
@@ -32,7 +32,7 @@ def intensity_matrix(image: RGBImage) -> ScalarImage:
 
 
 def component_image(image: RGBImage, channel: int) -> RGBImage:
-    """Показать яркость (-1) или канал (0=R, 1=G, 2=B) в полутонах."""
+    """Создание серого изображения по яркости(-1) и каналам r g b"""
     if channel not in (-1, 0, 1, 2):
         raise ValueError('Неизвестный канал.')
     result = []
@@ -47,7 +47,7 @@ def component_image(image: RGBImage, channel: int) -> RGBImage:
 
 
 def histograms(image: RGBImage) -> list[list[int]]:
-    """Абсолютные частоты I, R, G, B; яркость 0..255."""
+    """Подсчеты пикселей для гистограмм по каждому каналу"""
     result = [[0] * 256 for _ in range(4)]
     for row in image:
         for pixel in row:
@@ -60,10 +60,10 @@ def histograms(image: RGBImage) -> list[list[int]]:
 def statistics(
     values: list[float], method: str = 'two_pass'
 ) -> tuple[float, float, float]:
-    """Вернуть среднее, дисперсию и СКО; делитель N
-
-    two_pass: D = sum((u - mean) ** 2) / N, два прохода.
-    one_pass: D = sum(u ** 2) / N - mean ** 2, один проход.
+    """ среднее, дисперсия и СКО; делитель N т.е. 3
+    два прохода. 1. Среднее = (r + g + b)/3 -> 2. Дсп = ((r - сред)**2 + (g- сред)**2 + (b- сред)**2) / 3
+    один проход. Дисп = (r**2 + g**2 + b**2) / 3 - Среднее(rgb) ** 2
+    формулы применяются к яркостям пикселей
     """
     count = len(values)
     if count == 0:
@@ -71,40 +71,35 @@ def statistics(
     if method not in ('two_pass', 'one_pass'):
         raise ValueError('Неизвестный способ расчёта дисперсии.')
 
-    total = 0.0
-    square_total = 0.0
+    total = 0.0 # сумма яркостей
+    square_total = 0.0 # сумма яркостей**2
     for value in values:
-        total += value
+        total += value # складываем значения из списка
         if method == 'one_pass':
-            square_total += value * value
+            square_total += value * value # сложение квадратов
     mean = total / count
 
     if method == 'one_pass':
         variance = square_total / count - mean * mean
-        # Погрешность float иногда даёт отрицательное число,
-        # очень близкое к нулю.
         if variance < 0:
             variance = 0.0
     else:
-        deviation_total = 0.0
+        deviation_total = 0.0 # накопитель квадартов отклонений
         for value in values:
-            deviation_total += (value - mean) ** 2
+            deviation_total += (value - mean) ** 2 # перебор списка повторный
         variance = deviation_total / count
     return mean, variance, variance ** 0.5
 
 
-def window_values(
+def window_values( # сбор яркостей всех пикселей в окне
     image: RGBImage, x: int, y: int, size: int = 11
 ) -> list[float]:
-    """Яркости окна вокруг (x, y).
-    У края окно пересекается с изображением.
-    """
-    height, width = len(image), len(image[0])
+    height, width = len(image), len(image[0]) # размеры изображения: строки и пиксели в строке
     if size < 1 or size % 2 == 0:
         raise ValueError('Размер окна должен быть положительным и нечётным.')
     if not 0 <= x < width or not 0 <= y < height:
         raise ValueError('Точка находится вне изображения.')
-    radius = size // 2
+    radius = size // 2 # расстояние до центра от края
     values = []
     for row_y in range(max(0, y - radius), min(height, y + radius + 1)):
         for column_x in range(max(0, x - radius), min(width, x + radius + 1)):
@@ -113,8 +108,8 @@ def window_values(
 
 
 def row_profile(image: RGBImage, row_y: int) -> list[float]:
-    """Профиль яркости одной пиксельной строки.
-    Индексы строк начинаются от нуля.
+    """
+    Смена яркости слева направо
     """
     if not 0 <= row_y < len(image):
         raise ValueError('Номер строки вне изображения.')
