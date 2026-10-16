@@ -136,10 +136,10 @@ def blur_demo_image() -> RGBImage:
     for y in range(192):
         row = []
         for x in range(256):
-            value = 255 if x >= 128 else 0
-            if 32 <= x < 48 and 32 <= y < 48:
+            value = 255 if x >= 128 else 0 # деление изображение на чб пополам
+            if 32 <= x < 48 and 32 <= y < 48: # белый квадрат в черной половине
                 value = 255
             row.append((value, value, value))
         image.append(row)
-    image[96][64] = (255, 255, 255)
+    image[96][64] = (255, 255, 255) # белый пиксеот
     return image
